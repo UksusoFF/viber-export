@@ -1,6 +1,7 @@
 import sqlite3
 import argparse
 import re
+import json
 from shutil import copyfile
 
 
@@ -57,6 +58,7 @@ def main():
     template.close()
 
     data = []
+    table = []
     for user in users:
         info = user[4]
         phone = user[7]
@@ -86,14 +88,19 @@ def main():
         else:
             image = ''
 
-        data.append(f'<tr><td>{image}</td><td>{nick}</td><td>{fio}</td><td>{room}</td><td>{phone}</td></tr>')
+        data.append({'phone': phone, 'nick': nick, 'image': image})
+        table.append(f'<tr><td>{image}</td><td>{nick}</td><td>{fio}</td><td>{room}</td><td>{phone}</td></tr>')
 
-    output = re.sub(r'<tbody>(.*?)</tbody>', '<tbody>' + '\n'.join(data) + '</tbody>', s)
+    output = re.sub(r'<tbody>(.*?)</tbody>', '<tbody>' + '\n'.join(table) + '</tbody>', s)
     output = re.sub(r'<title>(.*?)</title>', f'<title>{args.chat} :: Список участников чата</title>', output)
 
-    result = open('result/index.html', 'w', encoding='utf-8')
-    result.write(output)
-    result.close()
+    index = open('result/index.html', 'w', encoding='utf-8')
+    index.write(output)
+    index.close()
+
+    meta = open('result/meta.json', 'w', encoding='utf-8')
+    json.dump(data, meta)
+    meta.close()
 
 
 if __name__ == '__main__':
