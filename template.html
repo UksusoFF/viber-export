@@ -32,6 +32,7 @@
         table.dataTable img.avatar {
             height: 20px;
             width: 20px;
+            vertical-align: middle;
         }
     </style>
 </head>
@@ -45,6 +46,7 @@
 <table id="cards" class="ui celled table responsive nowrap unstackable" style="width:100%">
     <thead>
     <tr>
+        <th></th>
         <th>Имя в чате</th>
         <th>Фамилия Имя</th>
         <th>Подъезд Квартира</th>
@@ -135,7 +137,8 @@
             "filter": true,
             "info": false,
             "autoWidth": false,
-            "aoColumns": [null, null, {"sType": "natural"}, null],
+            "aoColumns": [null, null, null, {"sType": "natural"}, null],
+            "order": [[ 3, "asc" ]]
         });
 
         $('input#search').on('keyup change', function() {
