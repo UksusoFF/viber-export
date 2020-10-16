@@ -1,5 +1,4 @@
-/.idea/*
-/data/*
-/__pycache__/*
 .config
 .DS_Store
+/.idea/*
+/__pycache__/*

@@ -1,6 +1,7 @@
 import sqlite3
 import argparse
 import re
+from shutil import copyfile
 
 
 def create_connection(db_file):
@@ -38,7 +39,7 @@ def main():
 
     args = parser.parse_args()
 
-    conn = create_connection(args.db_location)
+    conn = create_connection(f'{args.db_location}/viber.db')
 
     chats = execute(conn, f'SELECT ChatID FROM ChatInfo WHERE Name = "{args.chat}"')
 
@@ -60,6 +61,7 @@ def main():
         info = user[4]
         phone = user[7]
         nick = user[12]
+        avatar = user[13]
         if info is not None:
             if re.match(r'^[\u0400-\u04FF]*[ ][\u0400-\u04FF]*[ ]\d.*', info):
                 info = info.split(' ')
@@ -78,12 +80,18 @@ def main():
             fio = ''
             room = ''
 
-        data.append(f'<tr><td>{nick}</td><td>{fio}</td><td>{room}</td><td>{phone}</td></tr>')
+        if avatar is not None:
+            copyfile(f'{args.db_location}/Avatars/{avatar}', f'result/{avatar}.jpg')
+            image = f'<img class="avatar" src="{avatar}.jpg">'
+        else:
+            image = ''
+
+        data.append(f'<tr><td>{image}{nick}</td><td>{fio}</td><td>{room}</td><td>{phone}</td></tr>')
 
     output = re.sub(r'<tbody>(.*?)</tbody>', '<tbody>' + '\n'.join(data) + '</tbody>', s)
     output = re.sub(r'<title>(.*?)</title>', f'<title>{args.chat} :: Список участников чата</title>', output)
 
-    result = open('result.html', 'w', encoding='utf-8')
+    result = open('result/index.html', 'w', encoding='utf-8')
     result.write(output)
     result.close()
 
