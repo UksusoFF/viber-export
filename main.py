@@ -1,5 +1,6 @@
 import sqlite3
 import argparse
+import re
 
 
 def create_connection(db_file):
@@ -25,46 +26,67 @@ def main():
     )
     parser.add_argument(
         'db_location',
-        default="data/viber.db",
         metavar='db_location',
         type=str,
         help='The location of the Viber database'
     )
     parser.add_argument(
-        '--chatname',
-        default="Соседи 24",
+        '--chat',
         type=str,
-        help="Name of the chat to extract messages from"
+        help='Name of the chat to extract messages from'
     )
 
     args = parser.parse_args()
 
-    db_location = args.db_location
-    chat_name = args.chatname
+    conn = create_connection(args.db_location)
 
-    conn = create_connection(db_location)
+    chats = execute(conn, f'SELECT ChatID FROM ChatInfo WHERE Name = "{args.chat}"')
 
-    chat_id = execute(conn, "select ChatID from ChatInfo where instr(UPPER(Name), UPPER('" + chat_name + "')) > 0")
-    if len(chat_id) > 0:
-        chat_id = chat_id[0][0]
+    if len(chats) > 0:
+        chat_id = chats[0][0]
         print(chat_id)
     else:
-        print("Couldn't find that chat name.")
+        print("Can't find this chat name.")
         return
 
-    users = execute(conn, "SELECT * FROM ChatRelation LEFT JOIN Contact ON Contact.ContactID = ChatRelation.ContactID WHERE ChatRelation.ChatID = " + str(chat_id))
+    users = execute(conn, f'SELECT * FROM ChatRelation LEFT JOIN Contact ON Contact.ContactID = ChatRelation.ContactID WHERE ChatRelation.ChatID = {chat_id}')
 
+    template = open('template.html')
+    s = template.read()
+    template.close()
+
+    data = []
     for user in users:
-        print(user)
+        info = user[4]
+        phone = user[7]
+        nick = user[12]
+        if info is not None:
+            if re.match(r'^[\u0400-\u04FF]*[ ][\u0400-\u04FF]*[ ]\d.*', info):
+                info = info.split(' ')
+                family = info.pop(0)
+                name = info.pop(0)
+                fio = f'{family} {name}'
+                room = ' '.join(info)
+            elif re.match(r'^[\u0400-\u04FF]*[ ]\d.*', info):
+                info = info.split(' ')
+                fio = info.pop(0)
+                room = ' '.join(info)
+            else:
+                fio = info
+                room = ''
+        else:
+            fio = ''
+            room = ''
 
-    # print the messages to a text file
-    #with open(out_file, "w", encoding='utf-8') as f:
-    #    for message in final:
-    #        message = [str(message[0])[11:],
-    #                   ("From: " if int(message[3]) == 0 else "To:   ") + str(message[1]).ljust(22, ' '),
-    #                   str(message[2])]
-    #        f.write(", ".join(message) + "\n")
+        data.append(f'<tr><td>{nick}</td><td>{fio}</td><td>{room}</td><td>{phone}</td></tr>')
+
+    output = re.sub(r'<tbody>(.*?)</tbody>', '<tbody>' + '\n'.join(data) + '</tbody>', s)
+    output = re.sub(r'<title>(.*?)</title>', f'<title>{args.chat} :: Список участников чата</title>', output)
+
+    result = open('result.html', 'w', encoding='utf-8')
+    result.write(output)
+    result.close()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
