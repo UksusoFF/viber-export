@@ -1,7 +1,8 @@
-import sqlite3
 import argparse
-import re
 import json
+import os
+import re
+import sqlite3
 from shutil import copyfile
 
 
@@ -37,6 +38,12 @@ def main():
         type=str,
         help='Name of the chat to extract messages from'
     )
+    parser.add_argument(
+        '--output',
+        type=str,
+        default='result',
+        help='Name of the chat to extract messages from'
+    )
 
     args = parser.parse_args()
 
@@ -53,7 +60,7 @@ def main():
 
     users = execute(conn, f'SELECT * FROM ChatRelation LEFT JOIN Contact ON Contact.ContactID = ChatRelation.ContactID WHERE ChatRelation.ChatID = {chat_id}')
 
-    template = open('template.html')
+    template = open('template.html', 'r', encoding='utf-8')
     s = template.read()
     template.close()
 
@@ -66,15 +73,15 @@ def main():
         avatar = user[13]
         if info is not None:
             if re.match(r'^[\u0400-\u04FF]*[ ][\u0400-\u04FF]*[ ]\d.*', info):
-                info = info.split(' ')
-                family = info.pop(0)
-                name = info.pop(0)
+                parse = info.split(' ')
+                family = parse.pop(0)
+                name = parse.pop(0)
                 fio = f'{family} {name}'
-                room = ' '.join(info)
+                room = ' '.join(parse)
             elif re.match(r'^[\u0400-\u04FF]*[ ]\d.*', info):
-                info = info.split(' ')
-                fio = info.pop(0)
-                room = ' '.join(info)
+                parse = info.split(' ')
+                fio = parse.pop(0)
+                room = ' '.join(parse)
             else:
                 fio = info
                 room = ''
@@ -83,23 +90,52 @@ def main():
             room = ''
 
         if avatar is not None:
-            copyfile(f'{args.db_location}/Avatars/{avatar}', f'result/{avatar}.jpg')
-            image = f'<img class="avatar" src="{avatar}.jpg">'
+            path = f'{args.db_location}/Avatars/{avatar}'
+            if os.path.isfile(path) and os.access(path, os.R_OK):
+                copyfile(path, f'{args.output}/{avatar}.jpg')
+                image = f'<img class="avatar" src="{avatar}.jpg">'
+            else:
+                avatar = None
+                image = None
         else:
             image = ''
 
-        data.append({'phone': phone, 'nick': nick, 'image': image})
+        data.append({'phone': phone, 'nick': nick, 'info': info, 'avatar': avatar})
         table.append(f'<tr><td>{image}</td><td>{nick}</td><td>{fio}</td><td>{room}</td><td>{phone}</td></tr>')
 
     output = re.sub(r'<tbody>(.*?)</tbody>', '<tbody>' + '\n'.join(table) + '</tbody>', s)
     output = re.sub(r'<title>(.*?)</title>', f'<title>{args.chat} :: Список участников чата</title>', output)
 
-    index = open('result/index.html', 'w', encoding='utf-8')
+    index = open(f'{args.output}/index.html', 'w', encoding='utf-8')
     index.write(output)
     index.close()
 
-    meta = open('result/meta.json', 'w', encoding='utf-8')
-    json.dump(data, meta)
+    chat = open(f'{args.output}/chat.json', 'w', encoding='utf-8')
+    json.dump(data, chat, ensure_ascii=False)
+    chat.close()
+
+    contacts = execute(conn, f'SELECT * FROM Contact')
+
+    data = []
+    for contact in contacts:
+        info = contact[1]
+        viber = contact[3]
+        phone = contact[4]
+        nick = contact[9]
+        avatar = contact[10]
+        if viber == 1:
+            if phone is not None:
+                if avatar is not None:
+                    path = f'{args.db_location}/Avatars/{avatar}'
+                    if os.path.isfile(path) and os.access(path, os.R_OK):
+                        copyfile(path, f'{args.output}/{avatar}.jpg')
+                    else:
+                        avatar = None
+
+                data.append({'phone': phone, 'nick': nick, 'info': info, 'avatar': avatar})
+
+    meta = open(f'{args.output}/contacts.json', 'w', encoding='utf-8')
+    json.dump(data, meta, ensure_ascii=False)
     meta.close()
 
 
